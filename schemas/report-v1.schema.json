@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-skill-doctor.local/schemas/report-v1.schema.json",
+  "title": "Agent Skill Doctor Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "version", "started_at", "target", "skills", "findings", "summary"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "tool": {"const": "skill-doctor"},
+    "version": {"type": "string", "minLength": 1},
+    "started_at": {"type": "string", "format": "date-time"},
+    "target": {"type": "string", "minLength": 1},
+    "skills": {"type": "array", "items": {"$ref": "#/$defs/skill"}},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "summary": {"$ref": "#/$defs/summary"}
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {"path": {"type": "string", "minLength": 1}, "line": {"type": ["integer", "null"], "minimum": 1}}
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "files", "total_bytes"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "name": {"type": ["string", "null"]},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "total_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "severity", "category", "title", "message", "location", "evidence", "recommendation", "source"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Z]+[0-9]{3}$"},
+        "severity": {"enum": ["info", "warning", "error", "critical"]},
+        "category": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1},
+        "location": {"$ref": "#/$defs/location"},
+        "evidence": {"type": "string"},
+        "recommendation": {"type": "string"},
+        "source": {"type": "string", "minLength": 1}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "findings", "by_severity"],
+      "properties": {
+        "files": {"type": "integer", "minimum": 0},
+        "findings": {"type": "integer", "minimum": 0},
+        "by_severity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["info", "warning", "error", "critical"],
+          "properties": {
+            "info": {"type": "integer", "minimum": 0},
+            "warning": {"type": "integer", "minimum": 0},
+            "error": {"type": "integer", "minimum": 0},
+            "critical": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    }
+  }
+}
