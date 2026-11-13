@@ -1,11 +1,11 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
 from typer.testing import CliRunner
 
 from skill_doctor.cli import app
-from skill_doctor.scanner import scan, markdown
+from skill_doctor.scanner import scan
 
 runner = CliRunner()
 FIX = Path(__file__).parent / "fixtures"
@@ -49,8 +49,12 @@ def test_help_and_version():
 def test_collection_scans_nested_skills(tmp_path):
     (tmp_path / "alpha").mkdir()
     (tmp_path / "beta").mkdir()
-    (tmp_path / "alpha" / "SKILL.md").write_text((FIX / "valid" / "SKILL.md").read_text(encoding="utf8"), encoding="utf8")
-    (tmp_path / "beta" / "SKILL.md").write_text((FIX / "invalid" / "SKILL.md").read_text(encoding="utf8"), encoding="utf8")
+    (tmp_path / "alpha" / "SKILL.md").write_text(
+        (FIX / "valid" / "SKILL.md").read_text(encoding="utf8"), encoding="utf8"
+    )
+    (tmp_path / "beta" / "SKILL.md").write_text(
+        (FIX / "invalid" / "SKILL.md").read_text(encoding="utf8"), encoding="utf8"
+    )
     report = scan(tmp_path)
     assert [skill.path for skill in report.skills] == ["alpha/SKILL.md", "beta/SKILL.md"]
     assert report.summary.files == 2
@@ -58,7 +62,9 @@ def test_collection_scans_nested_skills(tmp_path):
 
 
 def test_markdown_output():
-    result = runner.invoke(app, ["check", str(FIX / "invalid"), "--format", "markdown", "--fail-on", "warning"])
+    result = runner.invoke(
+        app, ["check", str(FIX / "invalid"), "--format", "markdown", "--fail-on", "warning"]
+    )
     assert result.exit_code == 1
     assert "# Skill Doctor report" in result.stdout
     assert "SPEC005" in result.stdout
@@ -117,3 +123,40 @@ def test_scan_limit_reports_without_loading_large_file(tmp_path):
     )
     report = scan(tmp_path, max_file_bytes=20)
     assert report.findings[0].id == "FILE001"
+
+
+def test_security_scanner_redacts_secret(tmp_path):
+    from skill_doctor.analyzers import security_findings
+
+    (tmp_path / "SKILL.md").write_text(
+        "---\nname: secret-check\ndescription: Check secrets\n---\napi_key = '0123456789abcdef0123456789'\n",
+        encoding="utf8",
+    )
+    report = scan(tmp_path)
+    findings = security_findings(tmp_path, report)
+    assert findings and findings[0].id == "SEC001"
+    assert "0123456789abcdef" not in findings[0].evidence
+
+
+def test_cli_supports_html_report(tmp_path):
+    result = runner.invoke(app, ["check", str(FIX / "valid"), "--format", "html"])
+    assert result.exit_code == 0
+    assert "<!doctype html>" in result.stdout.lower()
+
+
+def test_symlink_manifest_is_rejected(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    manifest = outside / "SKILL.md"
+    manifest.write_text("---\nname: outside\ndescription: outside\n---\n", encoding="utf8")
+    link = tmp_path / "linked"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        return
+    try:
+        scan(link)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("symlink target should be rejected")

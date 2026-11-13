@@ -33,7 +33,7 @@ Agent Skill Doctor 为开发者提供本地运行、结果可追溯的检查流�
 - 收集资源清单；只读探测脚本解释器、明确声明的 CLI 和环境变量名称（绝不读取值）。
 - 基础静态安全规则：疑似凭据、危险 shell、下载后执行、敏感路径和可疑指令线索。
 - 按 Codex、Claude Code、OpenCode 规则分析发现路径、派生 ID、重复 ID、平台专属字段。
-- JSON、Markdown 报告和稳定退出码。
+- JSON、Markdown、HTML 报告和稳定退出码。
 - 可选 SkillSpector 后端集成列为后续增强，不作为首轮依赖。
 
 ### 暂不纳入

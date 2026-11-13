@@ -1,6 +1,6 @@
 # Agent Skill Doctor
 
-**本地优先的 Agent Skill 静态检查 CLI。** 检查 `SKILL.md` frontmatter、资源引用和目录内容，并生成 JSON 或 Markdown 报告。
+**本地优先的 Agent Skill 静态检查 CLI。** 检查 `SKILL.md` frontmatter、资源引用、依赖和安全风险，并生成 JSON、Markdown 或 HTML 报告。
 
 当前版本只读取本地文件，不连接网络、不执行 Skill 中的脚本，也不声称扫描结果能证明 Skill 绝对安全。
 
@@ -11,7 +11,9 @@
 - 检查 Markdown 本地引用是否缺失或越出 Skill 目录。
 - 输出资源清单、字节数及 `SKILL.md` SHA-256。
 - 提示过长描述、过长正文和重复标题等启发式问题。
-- 支持终端、JSON、Markdown 输出和严重级别退出门槛。
+- 静态扫描疑似密钥、危险命令、环境变量和当前 PATH 中不可用的命令。
+- 对 Skill 集合提示重复名称和相似描述（仅供人工复核）。
+- 支持终端、JSON、Markdown、HTML 输出和严重级别退出门槛。
 
 ## 环境要求
 
@@ -48,6 +50,12 @@ uv run skill-doctor check .\examples\skills --format json --fail-on warning
 
 # 显式指定 SKILL.md
 uv run skill-doctor check .\examples\skills\release-notes\SKILL.md --format json
+
+# HTML 报告和单项分析
+uv run skill-doctor report .\examples\skills --format html --output report.html
+uv run skill-doctor security .\examples\skills
+uv run skill-doctor deps .\examples\skills
+uv run skill-doctor conflicts .\examples\skills
 ```
 
 退出码：`0` 未达到门槛，`1` 存在达到门槛的问题，`2` 输入或扫描错误。
@@ -63,7 +71,7 @@ uv run ruff format --check .
 
 ## 当前范围
 
-这是本地 MVP。GitHub/网络扫描、运行时兼容性探测、高级安全规则和真实 Agent 测试仍在计划中。完整产品范围见 [`docs/agent-skill-doctor`](docs/agent-skill-doctor/README.md)。
+这是本地静态检查版本。GitHub/网络扫描、Codex/Claude Code/OpenCode 发现规则、高级安全规则和真实 Agent 测试仍在计划中。依赖与安全检查目前是启发式静态分析，可能产生误报或漏报。完整产品范围见 [`docs/agent-skill-doctor`](docs/agent-skill-doctor/README.md)。
 
 ## 报告与隐私
 
