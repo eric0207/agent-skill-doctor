@@ -398,6 +398,20 @@ def scan(target: Path, *, max_file_bytes: int = 1_000_000) -> Report:
     else:
         raise ValueError("target must be a directory or SKILL.md")
     skills, findings = [], []
+    if not files:
+        findings.append(
+            _finding(
+                "SCAN001",
+                ".",
+                None,
+                "No Skills found",
+                "No SKILL.md files were discovered under the target.",
+                str(target),
+                "Pass a Skill directory or a collection directory containing SKILL.md files.",
+                severity="warning",
+                category="discovery",
+            )
+        )
     for file in files:
         if file.is_symlink():
             findings.append(

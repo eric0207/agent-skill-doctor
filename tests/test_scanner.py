@@ -125,6 +125,13 @@ def test_scan_limit_reports_without_loading_large_file(tmp_path):
     assert report.findings[0].id == "FILE001"
 
 
+def test_empty_directory_reports_no_skills(tmp_path):
+    report = scan(tmp_path)
+    assert report.skills == []
+    assert report.findings[0].id == "SCAN001"
+    assert report.findings[0].severity == "warning"
+
+
 def test_security_scanner_redacts_secret(tmp_path):
     from skill_doctor.analyzers import security_findings
 
