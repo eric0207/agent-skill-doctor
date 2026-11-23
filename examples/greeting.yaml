@@ -1,0 +1,22 @@
+id: greeting
+skill: skills/doctor-greeting
+model: gpt-6.1-sol
+input: Greet Ada using the greeting Skill. Return raw JSON without Markdown fences.
+timeout_seconds: 180
+assertions:
+  - type: exit_code
+    value: 0
+  - type: file_exists
+    path: response.txt
+  - type: contains
+    path: response.txt
+    value: doctor-greeting-v1
+  - type: json_schema
+    path: response.txt
+    schema:
+      type: object
+      required: [greeting, skill_marker]
+      additionalProperties: false
+      properties:
+        greeting: {const: 'Hello, Ada!'}
+        skill_marker: {const: doctor-greeting-v1}

@@ -1,0 +1,17 @@
+{
+  "runtime": "sample-runtime",
+  "model": "sample-model",
+  "skill_version": "sample-v1",
+  "trials": [
+    {
+      "id": "extract-table",
+      "without_skill": {"success": false, "accuracy": 0.5, "triggered": false, "tokens": 1200, "seconds": 12},
+      "with_skill": {"success": true, "accuracy": 1.0, "triggered": true, "tokens": 800, "seconds": 8}
+    },
+    {
+      "id": "extract-heading",
+      "without_skill": {"success": true, "accuracy": 1.0, "triggered": false, "tokens": 600, "seconds": 6},
+      "with_skill": {"success": true, "accuracy": 1.0, "triggered": true, "tokens": 500, "seconds": 5}
+    }
+  ]
+}

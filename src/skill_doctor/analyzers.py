@@ -8,7 +8,8 @@ import shutil
 from difflib import SequenceMatcher
 from pathlib import Path
 
-from .scanner import Finding, Report, Skill, _finding
+from .scanner import Finding, Report, Skill, _finding, scan
+from .security import python_risks, text_risks
 
 SECRET_PATTERNS = [
     (
@@ -37,7 +38,7 @@ DANGEROUS_PATTERNS = [
     ),
     (
         "SEC005",
-        re.compile(r"(?i)\b(?:\.env|id_rsa|\.ssh/|credentials\.json)\b"),
+        re.compile(r"(?i)(?<![\w.])(?:\.env\b|id_rsa\b|\.ssh[/\\]|credentials\.json\b)"),
         "Sensitive path reference",
     ),
 ]
@@ -56,26 +57,59 @@ def _skill_files(root: Path, skill: Skill) -> list[tuple[str, Path]]:
     ]
 
 
+def _read_source(file: Path, root: Path) -> str:
+    try:
+        if file.is_symlink() or not file.resolve().is_relative_to(root) or not file.is_file():
+            return ""
+        with file.open("rb") as stream:
+            content = stream.read(1_000_001)
+        return content.decode("utf-8-sig") if len(content) <= 1_000_000 else ""
+    except (UnicodeError, OSError):
+        return ""
+
+
 def security_findings(root: Path, report: Report) -> list[Finding]:
     findings: list[Finding] = []
     for skill in report.skills:
         for rel, file in _skill_files(root, skill):
-            if file.is_symlink() or not file.is_file():
-                continue
-            try:
-                text = file.read_text(encoding="utf-8-sig")
-            except (UnicodeError, OSError):
-                continue
+            text = _read_source(file, root)
             path = (Path(skill.path).parent / rel).as_posix()
+            if file.suffix.lower() == ".py":
+                for line_no, api in python_risks(text):
+                    findings.append(
+                        _finding(
+                            "SEC009",
+                            path,
+                            line_no,
+                            "Dynamic code or shell execution",
+                            "Python AST identifies an execution API that needs review.",
+                            api,
+                            "Use explicit operations or pass an argument list without shell mode.",
+                            severity="warning",
+                            category="security",
+                        )
+                    )
             for line_no, line in enumerate(text.splitlines(), 1):
+                for rule, title, fix in text_risks(line):
+                    findings.append(
+                        _finding(
+                            rule,
+                            path,
+                            line_no,
+                            title,
+                            "Static risk pattern matched.",
+                            title,
+                            fix,
+                            severity="warning",
+                            category="security",
+                        )
+                    )
                 for rule, pattern, title in [*SECRET_PATTERNS, *DANGEROUS_PATTERNS]:
                     match = pattern.search(line)
                     if not match:
                         continue
                     severity = "critical" if rule in {"SEC001", "SEC002"} else "warning"
-                    evidence = line.strip()
-                    if rule in {"SEC001", "SEC002"}:
-                        evidence = pattern.sub("[REDACTED]", evidence)
+                    evidence = "[REDACTED]" if severity == "critical" else title
                     findings.append(
                         _finding(
                             rule,
@@ -96,12 +130,7 @@ def dependency_findings(root: Path, report: Report) -> list[Finding]:
     findings: list[Finding] = []
     for skill in report.skills:
         for rel, file in _skill_files(root, skill):
-            if file.is_symlink() or not file.is_file():
-                continue
-            try:
-                text = file.read_text(encoding="utf-8-sig")
-            except (UnicodeError, OSError):
-                continue
+            text = _read_source(file, root)
             path = (Path(skill.path).parent / rel).as_posix()
             for line_no, line in enumerate(text.splitlines(), 1):
                 shebang = SHEBANG_RE.search(line) if line_no == 1 else None
@@ -168,10 +197,10 @@ def conflict_findings(report: Report) -> list[Finding]:
             )
         else:
             by_name[skill.name] = skill
-        try:
-            content = (Path(report.target) / skill.path).read_text(encoding="utf-8-sig")
-        except (OSError, UnicodeError):
-            continue
+        root = Path(report.target)
+        if root.is_file():
+            root = root.parent
+        content = _read_source(root / skill.path, root)
         frontmatter = content.split("---", 2)
         if len(frontmatter) == 3:
             import yaml
@@ -204,3 +233,22 @@ def conflict_findings(report: Report) -> list[Finding]:
                     )
                 )
     return findings
+
+
+def analyze(target: Path, mode: str) -> Report:
+    report = scan(target)
+    root = target.resolve().parent if target.is_file() else target.resolve()
+    if mode in {"check", "security"}:
+        report.findings.extend(security_findings(root, report))
+    if mode in {"check", "deps"}:
+        report.findings.extend(dependency_findings(root, report))
+    if mode in {"check", "conflicts"}:
+        report.findings.extend(conflict_findings(report))
+    report.findings.sort(key=lambda f: (f.location.path, f.location.line or 0, f.id))
+    counts = {
+        level: sum(f.severity == level for f in report.findings)
+        for level in ("info", "warning", "error", "critical")
+    }
+    report.summary.findings = len(report.findings)
+    report.summary.by_severity = counts
+    return report

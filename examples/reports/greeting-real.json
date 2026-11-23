@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0",
+  "task": {
+    "id": "greeting",
+    "skill": "skills/doctor-greeting",
+    "input": "Greet Ada using the greeting Skill. Return raw JSON without Markdown fences.",
+    "model": "gpt-6.1-sol",
+    "timeout_seconds": 180,
+    "assertions": [
+      {
+        "type": "exit_code",
+        "path": null,
+        "value": 0,
+        "schema": null
+      },
+      {
+        "type": "file_exists",
+        "path": "response.txt",
+        "value": null,
+        "schema": null
+      },
+      {
+        "type": "contains",
+        "path": "response.txt",
+        "value": "doctor-greeting-v1",
+        "schema": null
+      },
+      {
+        "type": "json_schema",
+        "path": "response.txt",
+        "value": null,
+        "schema": {
+          "type": "object",
+          "required": [
+            "greeting",
+            "skill_marker"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "greeting": {
+              "const": "Hello, Ada!"
+            },
+            "skill_marker": {
+              "const": "doctor-greeting-v1"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "runtime": "codex",
+  "execution": {
+    "exit_code": 0,
+    "status": "completed",
+    "events": "{\"type\":\"thread.started\",\"thread_id\":\"01a2061d-af4f-7b70-83f2-10ca3424165e\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"error\",\"message\":\"Reconnecting... 2/5 (request timed out)\"}\n{\"type\":\"error\",\"message\":\"Reconnecting... 3/5 (request timed out)\"}\n{\"type\":\"error\",\"message\":\"Reconnecting... 4/5 (request timed out)\"}\n{\"type\":\"error\",\"message\":\"Reconnecting... 5/5 (request timed out)\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"error\",\"message\":\"Falling back from WebSockets to HTTPS transport. request timed out\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"{\\\"greeting\\\":\\\"Hello, Ada!\\\",\\\"skill_marker\\\":\\\"doctor-greeting-v1\\\"}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":19933,\"cached_input_tokens\":12288,\"cache_write_input_tokens\":0,\"output_tokens\":22,\"reasoning_output_tokens\":0}}\n",
+    "error": null,
+    "version": "codex-cli 0.169.1"
+  },
+  "duration_seconds": 120.84400000004098,
+  "skill_sha256": "3b170fde143ac2b9dcd27192e72a36fd8f06eaa17363802c480ce28483c0f527",
+  "bundle_sha256": "2f5bf9d4efc136f239906433bb648e6e06b82a680ef1f4be3d90f61d08da0f31",
+  "skill_discovery": "UNKNOWN",
+  "skill_usage": "UNKNOWN",
+  "evidence": {
+    "staged_manifest": ".agents/skills/trial/SKILL.md",
+    "skill_delivery": "explicit_prompt_content",
+    "event_types": [
+      "thread.started",
+      "turn.started",
+      "error",
+      "error",
+      "error",
+      "error",
+      "item.completed",
+      "item.completed",
+      "turn.completed"
+    ]
+  },
+  "assertions": [
+    {
+      "type": "exit_code",
+      "path": null,
+      "passed": true
+    },
+    {
+      "type": "file_exists",
+      "path": "response.txt",
+      "passed": true
+    },
+    {
+      "type": "contains",
+      "path": "response.txt",
+      "passed": true
+    },
+    {
+      "type": "json_schema",
+      "path": "response.txt",
+      "passed": true
+    }
+  ],
+  "passed": true
+}

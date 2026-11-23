@@ -167,3 +167,44 @@ def test_symlink_manifest_is_rejected(tmp_path):
         pass
     else:
         raise AssertionError("symlink target should be rejected")
+
+
+def test_security_reports_python_calls_without_exposing_source(tmp_path):
+    (tmp_path / "SKILL.md").write_text(
+        "---\nname: sample\ndescription: Example\n---\n"
+        "Review .env with token = 0123456789abcdef0123456789\n",
+        encoding="utf8",
+    )
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "sample.py").write_text(
+        "from subprocess import run as invoke\n"
+        "invoke(['tool'], shell=False)\n"
+        "invoke('tool', shell=True)\n"
+        "# eval('sample')\n",
+        encoding="utf8",
+    )
+    result = runner.invoke(app, ["security", str(tmp_path), "--format", "json"])
+    assert result.exit_code == 1
+    assert "0123456789abcdef0123456789" not in result.stdout
+    findings = json.loads(result.stdout)["findings"]
+    assert {"SEC001", "SEC005", "SEC009"} <= {finding["id"] for finding in findings}
+    assert [f["location"]["line"] for f in findings if f["id"] == "SEC009"] == [3]
+
+
+def test_benchmark_summarizes_pairs_and_rejects_duplicate_ids(tmp_path):
+    example = FIX.parent.parent / "examples" / "benchmark.json"
+    result = runner.invoke(app, ["benchmark", str(example)])
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.stdout)
+    assert report["trial_count"] == 2
+    assert report["delta"]["success_rate"] == 0.5
+    assert report["delta"]["total_tokens"] == -500
+
+    payload = json.loads(example.read_text(encoding="utf-8-sig"))
+    payload["trials"].append(payload["trials"][0])
+    path = tmp_path / "duplicate.json"
+    path.write_text(json.dumps(payload), encoding="utf8")
+    result = runner.invoke(app, ["benchmark", str(path)])
+    assert result.exit_code == 2
+    assert "trial IDs must be unique" in result.stderr

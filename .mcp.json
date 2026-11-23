@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "skill-doctor": {
+      "command": "skill-doctor",
+      "args": ["mcp"]
+    }
+  }
+}

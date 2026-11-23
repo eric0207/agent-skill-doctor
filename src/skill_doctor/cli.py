@@ -3,8 +3,8 @@ from pathlib import Path
 
 import typer
 
-from .analyzers import conflict_findings, dependency_findings, security_findings
-from .scanner import VERSION, html_report, markdown, plain_text, scan
+from .analyzers import analyze
+from .scanner import VERSION, html_report, markdown, plain_text
 
 app = typer.Typer(
     no_args_is_help=True, invoke_without_command=True, help="Local static Agent Skill checker."
@@ -26,25 +26,6 @@ def main(
         raise typer.Exit()
 
 
-def _analyze(target: Path, mode: str):
-    report = scan(target)
-    root = target.resolve().parent if target.is_file() else target.resolve()
-    if mode in {"check", "security"}:
-        report.findings.extend(security_findings(root, report))
-    if mode in {"check", "deps"}:
-        report.findings.extend(dependency_findings(root, report))
-    if mode in {"check", "conflicts"}:
-        report.findings.extend(conflict_findings(report))
-    report.findings.sort(key=lambda f: (f.location.path, f.location.line or 0, f.id))
-    counts = {
-        level: sum(f.severity == level for f in report.findings)
-        for level in ("info", "warning", "error", "critical")
-    }
-    report.summary.findings = len(report.findings)
-    report.summary.by_severity = counts
-    return report
-
-
 def _emit(target: Path, mode: str, format: str, output: Path | None, fail_on: str) -> None:
     formats = {"text", "json", "markdown", "html"}
     if format not in formats:
@@ -55,7 +36,7 @@ def _emit(target: Path, mode: str, format: str, output: Path | None, fail_on: st
             "must be info, warning, error, or critical", param_hint="--fail-on"
         )
     try:
-        report = _analyze(target, mode)
+        report = analyze(target, mode)
     except (OSError, ValueError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(2) from exc
@@ -109,23 +90,79 @@ _command("report", "Generate a report for a local Skill or collection.", "check"
 
 @app.command()
 def runtimes() -> None:
-    """Show runtime support status. Runtime execution adapters are not implemented yet."""
+    """Show the implemented runtime and its execution boundary."""
     typer.echo(
         json.dumps(
             {
                 "codex": {
-                    "status": "planned",
-                    "capability": "static discovery rules not implemented",
-                },
-                "claude-code": {
-                    "status": "planned",
-                    "capability": "static discovery rules not implemented",
-                },
-                "opencode": {
-                    "status": "planned",
-                    "capability": "static discovery rules not implemented",
-                },
+                    "status": "implemented",
+                    "sandbox": "read-only",
+                    "requires": ["--enable-agent", "--trusted-skill"],
+                    "skill_usage": "UNKNOWN",
+                }
             },
             indent=2,
         )
     )
+
+
+@app.command()
+def benchmark(results: Path) -> None:
+    """Summarize recorded paired trials with and without the Skill."""
+    from pydantic import ValidationError
+
+    from .benchmark import Experiment
+
+    try:
+        experiment = Experiment.model_validate_json(results.read_text(encoding="utf-8-sig"))
+    except ValidationError as exc:
+        for error in exc.errors(include_input=False, include_context=False, include_url=False):
+            location = ".".join(map(str, error["loc"])) or "experiment"
+            typer.echo(f"{location}: {error['msg']}", err=True)
+        raise typer.Exit(2) from exc
+    except (OSError, UnicodeError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(json.dumps(experiment.summarize(), indent=2, ensure_ascii=False))
+
+
+@app.command("mcp")
+def serve_mcp() -> None:
+    """Serve Skill audit tools over local MCP stdio."""
+    try:
+        from .mcp_server import server
+    except ModuleNotFoundError as exc:
+        if exc.name != "mcp":
+            raise
+        typer.echo("Install agent-skill-doctor with the [mcp] extra.", err=True)
+        raise typer.Exit(2) from exc
+    server.run(transport="stdio")
+
+
+@app.command("test")
+def test_skill(
+    task_file: Path,
+    output: Path = typer.Option(..., "--output"),  # noqa: B008
+    enable_agent: bool = typer.Option(False, "--enable-agent"),
+    trusted_skill: bool = typer.Option(False, "--trusted-skill"),
+) -> None:
+    """Run one explicitly enabled, trusted Skill trial with real Codex."""
+    from .runtime import load_task, run_task
+
+    try:
+        task = load_task(task_file)
+        report = run_task(
+            task,
+            task_file.resolve().parent / task.skill,
+            output,
+            enable_agent=enable_agent,
+            trusted_skill=trusted_skill,
+        )
+    except (OSError, ValueError):
+        typer.echo(
+            "Invalid task, execution consent, Skill, or output directory; check task configuration.",
+            err=True,
+        )
+        raise typer.Exit(2) from None
+    typer.echo(f"Report: {output / 'report.json'}; passed={report['passed']}")
+    raise typer.Exit(0 if report["passed"] else 1)

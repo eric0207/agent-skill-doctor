@@ -1,0 +1,7 @@
+{
+  "name": "skill-doctor",
+  "version": "0.1.0",
+  "description": "Audit local Agent Skills with Agent Skill Doctor.",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}
