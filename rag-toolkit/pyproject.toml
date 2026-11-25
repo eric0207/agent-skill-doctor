@@ -37,5 +37,5 @@ target-version = "py311"
 select = ["E", "F", "I"]
 
 [project.urls]
-Repository = "https://github.com/eric0207/agent-skill-doctor/tree/main/rag-toolkit"
-Issues = "https://github.com/eric0207/agent-skill-doctor/issues"
+Repository = "https://github.com/ericqin-ai/agent-skill-doctor/tree/main/rag-toolkit"
+Issues = "https://github.com/ericqin-ai/agent-skill-doctor/issues"

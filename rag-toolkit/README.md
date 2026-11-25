@@ -270,7 +270,7 @@ because the sandbox restricted event-loop operations. Test execution remained of
 
 The repository-root `.github/workflows/ci.yml` adds a separate rag-toolkit job
 for Python 3.11/3.12 on Ubuntu: locked dependency installation, Ruff, pytest,
-the evaluation example, and Compose configuration validation. The existing repository job is retained. The remote workflow has not been run as part of this local work.
+the evaluation example, and Compose configuration validation. The existing repository job is retained. The [verified CI run](https://github.com/ericqin-ai/agent-skill-doctor/actions/runs/45585387180) passed for Python 3.11/3.12 and the existing repository job.
 
 ## Project layout
 

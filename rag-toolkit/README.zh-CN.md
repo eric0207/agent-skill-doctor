@@ -254,7 +254,7 @@ Windows 开发机因沙箱事件循环限制，TestClient 在获准的沙箱外�
 
 仓库根目录 `.github/workflows/ci.yml` 增加 rag-toolkit 独立 job，
 在 Ubuntu、Python 3.11/3.12 下执行锁定依赖安装、Ruff、pytest、评测示例、Compose 配置检查，
-保留原有仓库 job。本次本地开发尚未运行远程 GitHub Actions。
+保留原有仓库 job。[实际 CI 运行](https://github.com/ericqin-ai/agent-skill-doctor/actions/runs/45585387180) 已通过 Python 3.11/3.12 以及原有仓库 job。
 
 ## 项目结构
 
