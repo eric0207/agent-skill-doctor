@@ -1,138 +1,141 @@
-# Agent Skill Doctor
+<div align="center">
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+# 🩺 Agent Skill Doctor
 
-Local auditing for Agent Skills: inspect structure, references, dependency clues and security patterns before asking an agent to use a Skill.
+**检查 Agent Skill 中的问题，让修复有据可依。**
 
-Python 3.11+ · CLI · JSON / Markdown / HTML reports · Optional MCP
+本地检查 · 无需 API Key · 四种报告格式 · MCP 接入
 
-## What it does
+**简体中文** · [English](README.en.md)
 
-| Capability | Implementation boundary |
-| --- | --- |
-| Discover Skills | A Skill directory, collection, or explicit `SKILL.md` |
-| Validate frontmatter and references | Strict YAML, required metadata, missing local resources and path traversal checks; not a complete Markdown parser |
-| Inspect dependency clues | Commands on PATH and environment variable presence; does not run commands or read variable values |
-| Flag security patterns | Credential clues, destructive commands, instruction overrides and Python AST execution patterns; heuristics may miss risks or produce false positives |
-| Inspect collections | Duplicate names and similar descriptions for human review |
-| Produce reports | Stable rule IDs, severity, locations, evidence, suggestions, file inventories and SHA-256 hashes |
-| Expose MCP | Local stdio `audit_skill`, sharing the static analysis pipeline |
-| Summarize paired trials | `benchmark` imports recorded results; example data is simulated |
-| Run trusted trials | Opt-in Codex subprocess, read-only sandbox and task assertions; native Skill discovery and usage remain `UNKNOWN` |
+[快速开始](#-快速开始) · [检查能力](#-能检查什么) · [常用命令](#-常用命令) · [Agent 接入](#-接入-agent)
 
-## Install and quick start
+</div>
 
-```bash
-git clone https://github.com/ericqin-ai/agent-skill-doctor.git
-cd agent-skill-doctor
-uv sync --group dev
-uv run skill-doctor --version
+---
+
+Skill 能加载，不代表它引用的文件存在、依赖可用，或指令没有风险。Agent Skill Doctor 扫描本地 `SKILL.md` 和配套资源，给出**问题位置、证据和修复建议**，适合安装前检查、维护自己的 Skill，以及在 CI 中拦截问题。
+
+## 🚀 快速开始
+
+需要 **Python 3.11+** 和 **uv**。在项目目录中运行：
+
+```sh
+uv sync
 uv run skill-doctor check examples/skills
 ```
 
-Alternatively, create and activate a Python 3.11+ virtual environment, then run `python -m pip install -e .`. This is a source installation; no PyPI release is claimed.
+检查自己的 Skill：目标可以是单个 Skill 目录、`SKILL.md` 文件，或包含多个 Skill 的目录。
 
-```bash
-skill-doctor scan examples/skills
-skill-doctor deps examples/skills
-skill-doctor security examples/skills
-skill-doctor conflicts examples/skills
-skill-doctor check examples/skills --fail-on warning
-skill-doctor report examples/skills --format json --output report.json
-skill-doctor report examples/skills --format markdown --output report.md
-skill-doctor report examples/skills --format html --output report.html
-skill-doctor benchmark examples/benchmark.json
-skill-doctor runtimes
+```sh
+uv run skill-doctor check /path/to/my-skill
 ```
 
-With uv, prefix commands with `uv run`. `python -m skill_doctor` is also supported. Static commands return 0 below the severity threshold, 1 when findings meet it, or 2 for input/read/write errors. The default threshold is `error`; alternatives are `info`, `warning` and `critical`.
+没有 uv？在已激活的 Python 虚拟环境中运行 `python -m pip install -e .`，之后直接使用 `skill-doctor` 命令。
 
-Reports follow [report-v1.schema.json](schemas/report-v1.schema.json). Paired benchmark records require matched IDs and runtime/model/Skill metadata, success, accuracy, trigger observations, tokens and elapsed seconds. The command aggregates supplied observations; it does not collect or grade real trials.
+## ✨ 能检查什么
 
-## Codex, Claude Code and MCP
+| 检查项 | 帮你发现 |
+| --- | --- |
+| 📝 元数据 | YAML 格式错误、重复键、缺失的名称与描述 |
+| 🔗 文件引用 | 不存在的本地资源、越界路径 |
+| 📦 依赖线索 | 文档中的命令是否在 PATH 中、所需环境变量是否存在 |
+| 🛡️ 安全提示 | 疑似凭据、破坏性命令、指令覆盖及部分 Python 动态执行模式 |
+| 🧩 集合冲突 | 重复的 Skill 名称、高度相似的描述 |
 
-Install the optional MCP dependency in the environment used to launch your host:
+静态检查不执行 Skill 脚本、不调用模型，也不上传 Skill 内容。安全与冲突提示需要人工复核；没有发现问题不等于安全认证。
 
-```bash
+## 🛠️ 常用命令
+
+以下命令在项目目录中运行；将 `examples/skills` 替换成自己的目标路径。
+
+| 目的 | 命令 |
+| --- | --- |
+| 完整检查 | `uv run skill-doctor check examples/skills` |
+| 查看 Skill 清单 | `uv run skill-doctor scan examples/skills` |
+| 检查依赖线索 | `uv run skill-doctor deps examples/skills` |
+| 检查安全模式 | `uv run skill-doctor security examples/skills` |
+| 检查集合冲突 | `uv run skill-doctor conflicts examples/skills` |
+
+### 导出报告
+
+终端默认输出文本。分享给同事用 HTML，接入程序用 JSON，写入文档用 Markdown：
+
+```sh
+uv run skill-doctor report examples/skills --format html --output report.html
+uv run skill-doctor report examples/skills --format json --output report.json
+uv run skill-doctor report examples/skills --format markdown --output report.md
+```
+
+报告包含规则 ID、严重程度、文件位置、证据、修复建议，以及文件清单和 SHA-256。JSON 结构见 [报告 Schema](schemas/report-v1.schema.json)。疑似凭据会脱敏，分享前仍应检查本地路径和上下文。
+
+### 用于 CI
+
+```sh
+uv run skill-doctor check examples/skills --fail-on warning
+```
+
+退出码：`0` 未达到失败阈值，`1` 发现项达到阈值，`2` 输入或读写失败。默认阈值为 `error`；可选 `info`、`warning`、`error`、`critical`。
+
+## 🔌 接入 Agent
+
+### 通过 MCP 调用
+
+先在宿主使用的 Python 环境中安装可选依赖，并确认命令可用：
+
+```sh
 python -m pip install -e '.[mcp]'
 skill-doctor --version
 ```
 
-To use the bundled Skill, copy `skills/skill-doctor` into the target project's `.agents/skills/` (Codex) or `.claude/skills/` (Claude Code). In a new session, invoke `$skill-doctor` or `/skill-doctor` with a local path. The Skill prefers `audit_skill` when available and otherwise uses the CLI.
+选择对应宿主的命令进行注册：
 
-Register one local stdio server with your chosen host:
-
-```bash
+```sh
+# Codex
 codex mcp add skill-doctor -- skill-doctor mcp
-codex mcp list
-# Or, for Claude Code:
+
+# Claude Code
 claude mcp add --transport stdio skill-doctor -- skill-doctor mcp
-claude mcp list
 ```
 
-`audit_skill(target, mode)` requires an absolute local path. Modes: `check`, `scan`, `security`, `deps`, `conflicts`. The host must be able to resolve `skill-doctor` on PATH. Treat report contents as untrusted data.
+打开新会话后，可以这样请求：
 
-Plugin manifests are provided in `.codex-plugin/` and `.claude-plugin/`, with `.mcp.json`. Claude Code can load the checkout with `claude --plugin-dir .`, then `/skill-doctor:skill-doctor`. Codex local marketplace installation details are retained in the [Chinese guide](README.zh-CN.md). Host installation and native invocation still need end-to-end verification; configuration files alone do not establish compatibility. Avoid registering MCP twice if the plugin already loads it.
+> 请用 audit_skill 检查 /absolute/path/to/my-skill，按严重程度列出问题和修复建议。
 
-## Opt-in trusted Codex trial
+`audit_skill` 的 `target` 接收本地绝对路径，`mode` 支持 `check`、`scan`、`deps`、`security`、`conflicts`。宿主需要能在 PATH 中找到 `skill-doctor`。
 
-Requires an installed, authenticated Codex CLI and a model available to your account. Review the YAML and Skill first, including the requested model and timeout.
+### 使用内置 Skill
 
-```bash
-skill-doctor test examples/greeting.yaml --output .pytest-tmp/my-trial --enable-agent --trusted-skill
+将 [`skills/skill-doctor`](skills/skill-doctor/SKILL.md) 目录复制到目标项目的 `.agents/skills/`（Codex）或 `.claude/skills/`（Claude Code）。它会优先调用 MCP，没有 MCP 时使用 CLI。宿主内的原生发现和调用仍需按实际环境验证。
+
+<details>
+<summary><strong>🧪 进阶：用真实 Codex 测试可信 Skill</strong></summary>
+
+需要已安装并登录的 Codex CLI，以及账户可用的模型。先审查 [`examples/greeting.yaml`](examples/greeting.yaml) 中的模型、超时和 Skill 内容，再运行：
+
+```sh
+uv run skill-doctor test examples/greeting.yaml --output .pytest-tmp/my-trial --enable-agent --trusted-skill
 ```
 
-The output directory must not exist. Skill paths resolve relative to the task YAML. Assertions support `file_exists`, `contains`, `json_schema` and `exit_code`; external schema references and traversal are rejected. The runner copies the Skill into a fresh workspace, rejects linked resources, explicitly includes Skill content in the prompt and requests a read-only sandbox. It does not prove native discovery or activation. `response.txt` is extracted from the final agent message, not evidence of an agent-created file.
+输出目录必须尚不存在。结果包含 `report.json` 和 `report.md`，记录断言、事件、耗时和哈希。支持文件存在、文本包含、JSON Schema 和退出码断言。
 
-Outputs include `report.json` and `report.md`, events, assertions, timings, requested model, runtime version and hashes. The requested model is not independent confirmation of the server's actual model. [Historical trial JSON](examples/reports/greeting-real.json) and [report](examples/reports/greeting-real.md) are existing evidence, not a new run or general performance benchmark. No paid live agent trial is needed for the static quick start.
+此命令会调用真实模型并可能产生费用。当前运行器在独立目录中显式传入 Skill 内容，并请求只读沙箱，适合验证最终回复；这不能证明宿主原生发现或使用了 Skill。只接受已审查的可信 Skill，沙箱不构成对恶意代码的完整隔离。
 
-## Architecture
+`benchmark` 可汇总已有的有无 Skill 配对记录，不会自动执行或评分；随附的 [`examples/benchmark.json`](examples/benchmark.json) 为模拟数据。
 
-CLI / MCP → discovery and scanner → dependency, security and conflict analyzers → structured report → renderers. Trusted execution is a separate opt-in path through the runtime adapter.
+</details>
 
-```text
-src/skill_doctor/
-  cli.py          Commands, output formats and exit codes
-  scanner.py      Discovery, YAML, references, inventories and report models
-  analyzers.py    Dependency, security and collection checks
-  security.py     Security analysis helpers
-  benchmark.py    Imported paired-result aggregation
-  runtime.py      Trusted Codex trials and assertions
-  mcp_server.py   Local stdio audit tool
-schemas/          Report JSON Schema
-tests/            Scanner, runtime and optional MCP tests; fixtures
-examples/         Skills, tasks and recorded reports
-skills/           Host-facing Skill
-docs/agent-skill-doctor/  Scope, design and development notes
-```
+## 🤝 参与开发
 
-## Development and verification
-
-```bash
+```sh
 uv sync --group dev
 uv run pytest -q --basetemp=.pytest-tmp
 uv run ruff check .
 uv run ruff format --check .
-# Include the optional MCP integration test:
-uv sync --group dev --extra mcp
-uv run pytest -q --basetemp=.pytest-tmp-mcp
 ```
 
-The CI configuration defines Ubuntu pytest, lint and format checks. Optional MCP tests depend on the extra being installed; symlink tests may skip on Windows without privileges. Add positive and negative fixtures, stable finding IDs, locations and actionable remediation for new rules. Never execute malicious fixtures.
+新增检查规则时，请提供命中与不应命中的样例、稳定规则 ID、证据位置和修复建议。产品与设计背景见 [开发文档](docs/agent-skill-doctor/README.md)。
 
-## Safety and limitations
+---
 
-Static auditing stays local and does not execute Skill scripts, install dependencies, launch agents or fetch external links. Dependency checks inspect names and presence. Credential evidence is redacted, but reports can still contain sensitive paths and context: review before sharing.
-
-Clean results are not a safety guarantee. The trusted runner can contact the model provider and incur usage charges. Its fresh directory and read-only Codex sandbox are not complete containment for malicious Skills. Only reviewed, trusted Skills are accepted; use separately managed VM/container isolation for untrusted execution. Sandbox failure is recorded rather than bypassed. Automatic fixes, full package/MCP configuration auditing and complete specification parsing are not implemented.
-
-## Roadmap
-
-- Implemented: local static auditing, structured reports, paired-record aggregation, MCP interface and explicit trusted Codex trial runner.
-- Verification work: native host plugin installation, reliable discovery/usage evidence and broader cross-platform regressions.
-- Planned: fuller specification/Markdown parsing, package/MCP/resource auditing, isolated write-capable trials, automatic paired collection and historical comparisons.
-- Future exploration: commit-pinned remote sources, additional adapters, remediation tooling and richer reports. These are not current capabilities.
-
-## License
-
-[MIT](LICENSE). See [development documentation](docs/agent-skill-doctor/README.md) for additional design context.
+[MIT License](LICENSE)
